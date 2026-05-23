@@ -73,3 +73,12 @@ jobs:
 
       - name: Confirm deployment
         run: echo "App live at http://${{ secrets.EC2_HOST }}:5000"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          aws sns publish \
+            --topic-arn ${{ secrets.SNS_TOPIC_ARN }} \
+            --subject "Pipeline Failed - my-app" \
+            --message "Pipeline failed on commit ${{ github.sha }} by ${{ github.actor }}. Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --region ${{ env.AWS_REGION }}
