@@ -1,0 +1,35 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r app/requirements.txt
+          pip install flake8
+
+      - name: Lint code
+        run: flake8 app/ --max-line-length=100
+
+      - name: Build Docker image
+        run: docker build -t my-app:${{ github.sha }} .
+
+      - name: Confirm build success
+        run: echo "Docker image built successfully with tag ${{ github.sha }}"
