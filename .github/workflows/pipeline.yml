@@ -10,6 +10,9 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: my-app
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Test
