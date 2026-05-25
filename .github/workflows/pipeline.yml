@@ -32,15 +32,15 @@ jobs:
           pip install -r app/requirements.txt
           pip install flake8
 
-      - name: Lint code
-        run: flake8 app/ --max-line-length=100
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Lint code
+        run: flake8 app/ --max-line-length=100
 
       - name: Login to Amazon ECR
         id: login-ecr

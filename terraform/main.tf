@@ -58,6 +58,7 @@ resource "aws_instance" "app_server" {
     yum update -y
     yum install -y docker
     service docker start
+    systemctl enable docker
     usermod -aG docker ec2-user
     yum install -y aws-cli
   SCRIPT
