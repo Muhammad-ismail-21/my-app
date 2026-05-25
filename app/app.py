@@ -210,8 +210,6 @@ DASHBOARD_HTML = """
         <div class="grid">
             <div class="card">
                 <div class="card-title">CI/CD Pipeline Steps</div>
-                
-		
 		<div class="pipeline-step">
                     <div class="step-icon">✓</div>
                     <span class="step-label">Checkout code</span>
@@ -242,7 +240,6 @@ DASHBOARD_HTML = """
                     <span class="step-label">Deploy to EC2</span>
                     <span class="step-status">✔ done</span>
                 </div>
-
             </div>
             <div class="card">
                 <div class="card-title">Tech Stack</div>
@@ -407,4 +404,5 @@ def health():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
 
