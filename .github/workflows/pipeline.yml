@@ -32,15 +32,15 @@ jobs:
           pip install -r app/requirements.txt
           pip install flake8
 
-      - name: Lint code
-        run: flake8 app/ --max-line-length=100
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Lint code
+        run: flake8 app/ --max-line-length=100
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -69,7 +69,10 @@ jobs:
             docker stop my-app-dev || true
             docker rm my-app-dev || true
             docker pull $IMAGE_URI
-            docker run -d --name my-app-dev -p 5001:5000 $IMAGE_URI
+            docker run -d --name my-app-dev -p 5001:5000 \
+              -e ENVIRONMENT=DEV \
+              -e GIT_SHA=${{ github.sha }} \
+              $IMAGE_URI
             echo "DEV deployed at port 5001"
 
       - name: Deploy to EC2 (prod)
@@ -87,15 +90,18 @@ jobs:
             docker stop my-app || true
             docker rm my-app || true
             docker pull $IMAGE_URI
-            docker run -d --name my-app -p 5000:5000 $IMAGE_URI
+            docker run -d --name my-app -p 5000:5000 \
+              -e ENVIRONMENT=PROD \
+              -e GIT_SHA=${{ github.sha }} \
+              $IMAGE_URI
             echo "PROD deployed at port 5000"
 
       - name: Confirm deployment
         run: |
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            echo "DEV app live at http://${{ secrets.EC2_HOST }}:5001"
+            echo "DEV dashboard live at http://${{ secrets.EC2_HOST }}:5001"
           else
-            echo "PROD app live at http://${{ secrets.EC2_HOST }}:5000"
+            echo "PROD dashboard live at http://${{ secrets.EC2_HOST }}:5000"
           fi
 
       - name: Notify on failure
