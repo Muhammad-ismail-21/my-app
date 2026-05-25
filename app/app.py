@@ -87,18 +87,50 @@ DASHBOARD_HTML = """
         .pipeline-step {
             display: flex;
             align-items: center;
-            padding: 10px 0;
+            padding: 12px 10px;
             border-bottom: 1px solid #21262d;
+            border-radius: 8px;
             font-size: 0.88rem;
             opacity: 0;
             transform: translateX(-10px);
-            transition: opacity 0.4s ease, transform 0.4s ease;
+            transition: opacity 0.5s ease, transform 0.5s ease, background 0.3s ease;
+            margin-bottom: 2px;
         }
-        .pipeline-step.visible {
+        .pipeline-step.active {
+            background: #1f3a1f;
+            border: 1px solid #238636;
             opacity: 1;
             transform: translateX(0);
         }
-        .pipeline-step:last-child { border-bottom: none; }
+        .pipeline-step.active .step-icon {
+            background: #238636;
+            box-shadow: 0 0 10px #3fb950;
+            animation: glow 1s ease-in-out;
+        }
+        .pipeline-step.done {
+            opacity: 1;
+            transform: translateX(0);
+            background: #161b22;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #3fb950; }
+            50% { box-shadow: 0 0 20px #3fb950, 0 0 40px #3fb950; }
+            100% { box-shadow: 0 0 5px #3fb950; }
+        }
+        .step-label {
+            flex: 1;
+        }
+        .step-status {
+            font-size: 0.75rem;
+            color: #3fb950;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .pipeline-step.done .step-status,
+        .pipeline-step.active .step-status {
+            opacity: 1;
+        }
+	.pipeline-step:last-child { border-bottom: none; }
         .step-icon {
             width: 24px;
             height: 24px;
@@ -178,24 +210,39 @@ DASHBOARD_HTML = """
         <div class="grid">
             <div class="card">
                 <div class="card-title">CI/CD Pipeline Steps</div>
-                <div class="pipeline-step">
-                    <div class="step-icon">v</div> Checkout code
+                
+		
+		<div class="pipeline-step">
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Checkout code</span>
+                    <span class="step-status">✔ done</span>
                 </div>
                 <div class="pipeline-step">
-                    <div class="step-icon">v</div> Install dependencies
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Install dependencies</span>
+                    <span class="step-status">✔ done</span>
                 </div>
                 <div class="pipeline-step">
-                    <div class="step-icon">v</div> Lint code (flake8)
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Lint code (flake8)</span>
+                    <span class="step-status">✔ done</span>
                 </div>
                 <div class="pipeline-step">
-                    <div class="step-icon">v</div> Build Docker image
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Build Docker image</span>
+                    <span class="step-status">✔ done</span>
                 </div>
                 <div class="pipeline-step">
-                    <div class="step-icon">v</div> Push to AWS ECR
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Push to AWS ECR</span>
+                    <span class="step-status">✔ done</span>
                 </div>
                 <div class="pipeline-step">
-                    <div class="step-icon">v</div> Deploy to EC2
+                    <div class="step-icon">✓</div>
+                    <span class="step-label">Deploy to EC2</span>
+                    <span class="step-status">✔ done</span>
                 </div>
+
             </div>
             <div class="card">
                 <div class="card-title">Tech Stack</div>
@@ -254,11 +301,26 @@ DASHBOARD_HTML = """
         </div>
     </div>
     <script>
-        // Animate pipeline steps on load
+        
+	
+	// Animate pipeline steps sequentially like a real deployment
         const steps = document.querySelectorAll('.pipeline-step');
-        steps.forEach((step, i) => {
-            setTimeout(() => step.classList.add('visible'), i * 200);
-        });
+        let currentStep = 0;
+
+        function runNextStep() {
+            if (currentStep > 0) {
+                steps[currentStep - 1].classList.remove('active');
+                steps[currentStep - 1].classList.add('done');
+            }
+            if (currentStep < steps.length) {
+                steps[currentStep].classList.add('active');
+                currentStep++;
+                setTimeout(runNextStep, 800);
+            }
+        }
+
+        setTimeout(runNextStep, 500);
+	
 
         // Live clock
         function updateClock() {
@@ -345,3 +407,4 @@ def health():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
