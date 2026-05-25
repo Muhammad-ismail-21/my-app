@@ -72,6 +72,8 @@ jobs:
             docker run -d --name my-app-dev -p 5001:5000 \
               -e ENVIRONMENT=DEV \
               -e GIT_SHA=${{ github.sha }} \
+              -e S3_BUCKET=${{ secrets.S3_BUCKET }} \
+              -e AWS_REGION=$AWS_REGION \
               $IMAGE_URI
             echo "DEV deployed at port 5001"
 
@@ -93,8 +95,22 @@ jobs:
             docker run -d --name my-app -p 5000:5000 \
               -e ENVIRONMENT=PROD \
               -e GIT_SHA=${{ github.sha }} \
+              -e S3_BUCKET=${{ secrets.S3_BUCKET }} \
+              -e AWS_REGION=$AWS_REGION \
               $IMAGE_URI
             echo "PROD deployed at port 5000"
+
+      - name: Write deployment log to S3
+        if: success()
+        run: |
+          ENVIRONMENT=$( [ "${{ github.ref }}" = "refs/heads/main" ] && echo "PROD" || echo "DEV" )
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S")
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          FILENAME="logs/$(date -u +%Y%m%d%H%M%S)-${SHORT_SHA}.json"
+          echo "{\"sha\":\"${SHORT_SHA}\",\"environment\":\"${ENVIRONMENT}\",\"timestamp\":\"${TIMESTAMP}\",\"actor\":\"${{ github.actor }}\",\"status\":\"success\"}" > deploy_log.json
+          aws s3 cp deploy_log.json s3://${{ secrets.S3_BUCKET }}/${FILENAME}
+          echo "Deployment log written to S3"
 
       - name: Confirm deployment
         run: |

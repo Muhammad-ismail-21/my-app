@@ -1,10 +1,14 @@
 from flask import Flask, jsonify, render_template_string
 import datetime
 import os
+import json
+import boto3
 
 app = Flask(__name__)
 
 START_TIME = datetime.datetime.utcnow()
+S3_BUCKET = os.environ.get('S3_BUCKET', '')
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
@@ -86,6 +90,13 @@ DASHBOARD_HTML = """
             padding: 10px 0;
             border-bottom: 1px solid #21262d;
             font-size: 0.88rem;
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .pipeline-step.visible {
+            opacity: 1;
+            transform: translateX(0);
         }
         .pipeline-step:last-child { border-bottom: none; }
         .step-icon {
@@ -101,18 +112,36 @@ DASHBOARD_HTML = """
             margin-right: 12px;
             flex-shrink: 0;
         }
-        .footer { text-align: center; margin-top: 40px; color: #8b949e; font-size: 0.8rem; }
-        .refresh-btn {
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: #58a6ff;
-            padding: 8px 20px;
-            border-radius: 8px;
-            cursor: pointer;
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: 0.85rem;
-            margin-top: 20px;
+            margin-top: 10px;
         }
-        .refresh-btn:hover { background: #30363d; }
+        .history-table th {
+            text-align: left;
+            color: #8b949e;
+            padding: 6px 8px;
+            border-bottom: 1px solid #30363d;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .history-table td {
+            padding: 8px;
+            border-bottom: 1px solid #21262d;
+            color: #e6edf3;
+        }
+        .history-table tr:last-child td { border-bottom: none; }
+        .env-prod { color: #3fb950; font-weight: bold; }
+        .env-dev { color: #58a6ff; font-weight: bold; }
+        .footer { text-align: center; margin-top: 40px; color: #8b949e; font-size: 0.8rem; }
+        .refresh-info {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-top: 16px;
+        }
+        .countdown { color: #58a6ff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -130,7 +159,7 @@ DASHBOARD_HTML = """
             </div>
             <div class="card">
                 <div class="card-title">Server Uptime</div>
-                <div class="card-value">{{ uptime }}</div>
+                <div class="card-value" id="uptime">{{ uptime }}</div>
                 <div class="card-sub">Since last deployment</div>
             </div>
             <div class="card">
@@ -142,7 +171,7 @@ DASHBOARD_HTML = """
             </div>
             <div class="card">
                 <div class="card-title">Current Time (UTC)</div>
-                <div class="card-value" style="font-size:1.1rem;">{{ current_time }}</div>
+                <div class="card-value" style="font-size:1.1rem;" id="clock">{{ current_time }}</div>
                 <div class="card-sub">Server time</div>
             </div>
         </div>
@@ -178,20 +207,109 @@ DASHBOARD_HTML = """
                     <span class="stack-item">Terraform</span>
                     <span class="stack-item">CloudWatch</span>
                     <span class="stack-item">AWS SNS</span>
+                    <span class="stack-item">AWS S3</span>
                     <span class="stack-item">Python Flask</span>
                 </div>
             </div>
         </div>
-        <div style="text-align:center;">
-            <button class="refresh-btn" onclick="location.reload()">Refresh Dashboard</button>
+        <div class="card" style="margin-bottom:30px;">
+            <div class="card-title">Deployment History (from AWS S3)</div>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>SHA</th>
+                        <th>Environment</th>
+                        <th>Deployed At (UTC)</th>
+                        <th>By</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in deployment_logs %}
+                    <tr>
+                        <td style="font-family:monospace;">{{ log.sha }}</td>
+                        <td class="{{ 'env-prod' if log.environment == 'PROD' else 'env-dev' }}">
+                            {{ log.environment }}
+                        </td>
+                        <td>{{ log.timestamp }}</td>
+                        <td>{{ log.actor }}</td>
+                        <td style="color:#3fb950;">{{ log.status }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not deployment_logs %}
+                    <tr>
+                        <td colspan="5" style="color:#8b949e; text-align:center; padding:16px;">
+                            No deployments yet
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="refresh-info">
+            Auto-refreshing in <span class="countdown" id="countdown">30</span>s
         </div>
         <div class="footer">
             <p>Deployed via GitHub Actions | Hosted on AWS EC2 t3.micro | Infrastructure by Terraform</p>
         </div>
     </div>
+    <script>
+        // Animate pipeline steps on load
+        const steps = document.querySelectorAll('.pipeline-step');
+        steps.forEach((step, i) => {
+            setTimeout(() => step.classList.add('visible'), i * 200);
+        });
+
+        // Live clock
+        function updateClock() {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            document.getElementById('clock').textContent =
+                now.getUTCFullYear() + '-' +
+                pad(now.getUTCMonth() + 1) + '-' +
+                pad(now.getUTCDate()) + ' ' +
+                pad(now.getUTCHours()) + ':' +
+                pad(now.getUTCMinutes()) + ':' +
+                pad(now.getUTCSeconds());
+        }
+        setInterval(updateClock, 1000);
+
+        // Countdown and auto-refresh
+        let count = 30;
+        setInterval(() => {
+            count--;
+            document.getElementById('countdown').textContent = count;
+            if (count <= 0) location.reload();
+        }, 1000);
+    </script>
 </body>
 </html>
 """
+
+
+def get_deployment_logs():
+    try:
+        s3 = boto3.client('s3', region_name=AWS_REGION)
+        response = s3.list_objects_v2(
+            Bucket=S3_BUCKET,
+            Prefix='logs/',
+            MaxKeys=10
+        )
+        if 'Contents' not in response:
+            return []
+        files = sorted(
+            response['Contents'],
+            key=lambda x: x['LastModified'],
+            reverse=True
+        )[:5]
+        logs = []
+        for f in files:
+            obj = s3.get_object(Bucket=S3_BUCKET, Key=f['Key'])
+            data = json.loads(obj['Body'].read().decode('utf-8'))
+            logs.append(data)
+        return logs
+    except Exception:
+        return []
 
 
 @app.route('/')
@@ -203,13 +321,15 @@ def dashboard():
     environment = os.environ.get('ENVIRONMENT', 'PROD')
     badge_class = 'badge-dev' if environment == 'DEV' else 'badge-prod'
     git_sha = os.environ.get('GIT_SHA', 'local')[:7]
+    deployment_logs = get_deployment_logs()
     return render_template_string(
         DASHBOARD_HTML,
         uptime=f'{hours}h {minutes}m {seconds}s',
         environment=environment,
         badge_class=badge_class,
         git_sha=git_sha,
-        current_time=datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        current_time=datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        deployment_logs=deployment_logs
     )
 
 
