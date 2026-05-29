@@ -369,15 +369,14 @@ DASHBOARD_HTML = """
 def get_deployment_logs():
     try:
         s3 = boto3.client('s3', region_name=AWS_REGION)
-        response = s3.list_objects_v2(
-            Bucket=S3_BUCKET,
-            Prefix='logs/',
-            MaxKeys=10
-        )
-        if 'Contents' not in response:
+        all_files = []
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=S3_BUCKET, Prefix='logs/'):
+            all_files.extend(page.get('Contents', []))
+        if not all_files:
             return []
         files = sorted(
-            response['Contents'],
+            all_files,
             key=lambda x: x['LastModified'],
             reverse=True
         )[:5]
