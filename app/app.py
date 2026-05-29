@@ -209,7 +209,12 @@ DASHBOARD_HTML = """
                 <div class="card-title">CI/CD Pipeline Steps</div>
                 <div class="pipeline-step">
                     <div class="step-icon">&#10003;</div>
-                    <span class="step-label">Checkout code</span>
+                    <span class="step-label">Code pushed to GitHub</span>
+                    <span class="step-status">done</span>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-icon">&#10003;</div>
+                    <span class="step-label">GitHub Actions triggered</span>
                     <span class="step-status">done</span>
                 </div>
                 <div class="pipeline-step">
@@ -219,22 +224,42 @@ DASHBOARD_HTML = """
                 </div>
                 <div class="pipeline-step">
                     <div class="step-icon">&#10003;</div>
-                    <span class="step-label">Lint code (flake8)</span>
+                    <span class="step-label">Configure AWS credentials</span>
                     <span class="step-status">done</span>
                 </div>
                 <div class="pipeline-step">
                     <div class="step-icon">&#10003;</div>
-                    <span class="step-label">Build Docker image</span>
+                    <span class="step-label">Lint code — flake8 quality gate</span>
                     <span class="step-status">done</span>
                 </div>
                 <div class="pipeline-step">
                     <div class="step-icon">&#10003;</div>
-                    <span class="step-label">Push to AWS ECR</span>
+                    <span class="step-label">Login to AWS ECR</span>
                     <span class="step-status">done</span>
                 </div>
                 <div class="pipeline-step">
                     <div class="step-icon">&#10003;</div>
-                    <span class="step-label">Deploy to EC2</span>
+                    <span class="step-label">Build Docker image (tagged by Git SHA)</span>
+                    <span class="step-status">done</span>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-icon">&#10003;</div>
+                    <span class="step-label">Push image to AWS ECR</span>
+                    <span class="step-status">done</span>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-icon">&#10003;</div>
+                    <span class="step-label">SSH into EC2 and deploy container</span>
+                    <span class="step-status">done</span>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-icon">&#10003;</div>
+                    <span class="step-label">Write deployment log to AWS S3</span>
+                    <span class="step-status">done</span>
+                </div>
+                <div class="pipeline-step">
+                    <div class="step-icon">&#10003;</div>
+                    <span class="step-label">Email alert on failure via SNS</span>
                     <span class="step-status">done</span>
                 </div>
             </div>
